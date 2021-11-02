@@ -1,9 +1,8 @@
 #!/usr/bin/pip
 #!/usr/bin
 import argparse
-import os
-import sys
 import numpy as np
+import time as tt
 
 #parsing args
 parser = argparse.ArgumentParser(description='parse main args')
@@ -26,17 +25,12 @@ time = 0
 graph = []
 numberOfNodes = 0; 
 
-def printRes(): 
-    print(graph)
-
 def readMatrix(): 
     with open(pathToEx) as f:
     	numberOfNodes = int(f.readline())
     	for i in range(0, numberOfNodes):
     	    graph.append(list(map(int, f.readline().split(' ')[:numberOfNodes])))
 
-def branchBound():
-    print("here")
     
 #----------
   
@@ -73,7 +67,7 @@ def minValue(couleursVoisins):
     
 
 def glouton(m):
-#initialisation
+    #initialisation
     n = len(m[0]) 
     c = [None]*n
     voisins = []
@@ -87,23 +81,77 @@ def glouton(m):
     while any(x == None for x in c):
         v , couleursVoisins = choixGlouton(c,nbDegre,voisins,n)
         c[v] = minValue(couleursVoisins)
-    print("Coloration: ",c)
+    return c
     
     
 
 #----------
 
+
+def possibleColor(couleursVoisins, color) : 
+    if color in couleursVoisins:
+        return False
+    return True
+
+def exploreNode(c,nbDegre,voisins,n) : 
+    listNodes = []
+    c = [None if x==-1 else x for x in c]
+    v , couleursVoisins = choixGlouton(c,nbDegre,voisins,n)
+    c = [-1 if x==None else x for x in c]
+    for i in range(max(c)+2) :        
+        if possibleColor(couleursVoisins, i) :
+            newC = c
+            newC[v] = i
+            listNodes.append(newC)
+    return listNodes
+
+
+def branchBound():
+    res = glouton(graph)
+    ub = max(res)+1
+    stack = []
+    n = len(graph[0]) 
+    c = [-1]*n #le couleur des noeau from 0 to n
+    voisins = []
+    for i in range(n):
+        voisins.append([idx for idx in range(n) if graph[i][idx]==1])
+    nbDegre = [len(i) for i in voisins] 
+    max_value = max(nbDegre)
+    v = nbDegre.index(max_value) #sommet qui a plus de donnees
+    c[v] = 0 # premier couleur
+    
+    stack.append(c)
+    while len(stack):
+        c = stack.pop()
+        if not(any(x == -1 for x in c)):
+            if (max(c)+1) < max(res)+1 :
+                res = c
+                ub = max(c)+1
+        else :
+            if max(c) + 1 < ub:  
+                for i in exploreNode(c,nbDegre,voisins,n) :
+                    stack.append(i)
+    return res
+
 def main():
     if algoType == "glouton": 
         readMatrix()
-        glouton(graph)
+        t0 = tt.time()
+        resultG = glouton(graph)
+        t1 = tt.time()
+        if showRes:
+            print(resultG)
+        if showTime:
+       	    print(t1 - t0)
     elif algoType=="branch_bound":
     	readMatrix()
-    	branchBound()
+    	t2 = tt.time()
+    	resultBB = branchBound()
+    	t3 = tt.time()
     	if showRes:
-    	    printRes()
+    	    print(resultBB)
     	if showTime:
-    	    print("showTime")
+    	    print(t3 - t2)
     elif algoType == "tabou":
 	    print("tabou")
     else: 
