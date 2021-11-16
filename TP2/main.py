@@ -21,11 +21,12 @@ pathToEx = args.e
 showRes = args.res
 showTime = args.time
 
+
 # global variables
 time = 0
 aretes = []
 voisins = []
-
+listeCounterNoModif = []
 
 def readMatrix():
     with open(pathToEx) as f:
@@ -42,7 +43,7 @@ def readMatrix():
         graph[a[1]][a[0]] = 1
     return graph, numberOfNodes
 
-def choixGlouton(c, nbDegre, voisins, n):
+def choixGlouton(c, nbDegre, n):
     sommetsSansCouleur = [i for i in range(n) if c[i] == None]
     listeCouleursVoisins = []
     for i in sommetsSansCouleur:
@@ -86,7 +87,7 @@ def glouton(m, numberOfNodes):
     c[v] = 0
 
     while any(x == None for x in c):
-        v, couleursVoisins = choixGlouton(c, nbDegre, voisins, n)
+        v, couleursVoisins = choixGlouton(c, nbDegre, n)
         c[v] = minValue(couleursVoisins)
     #print("nb couleur glouton :", max(c) + 1)
     return c
@@ -101,44 +102,39 @@ def possibleColor(couleursVoisins, color):
     return True
 
 
-def exploreNode(c, nbDegre, voisins, n):
+def exploreNode(c, nbDegre, n):
     listNodes = []
-    c = [None if x == -1 else x for x in c]
-    v, couleursVoisins = choixGlouton(c, nbDegre, voisins, n)
-    c = [-1 if x == None else x for x in c]
+    c = [None if x == -1 else x for x in c].copy()
+    v, couleursVoisins = choixGlouton(c, nbDegre, n)
+    c = [-1 if x == None else x for x in c].copy()
     for i in range(max(c) + 2):
         if possibleColor(couleursVoisins, i):
-            newC = c
+            newC = c.copy()
             newC[v] = i
             listNodes.append(newC)
     return listNodes
 
 
-def branchBound(graph,numberOfNodes):
-    res = glouton(graph,numberOfNodes)
+def branchBound(graph):
+    n = len(graph[0])
+    res = glouton(graph, n)
     ub = max(res) + 1
     stack = []
-    n = len(graph[0])
     c = [-1] * n  # le couleur des noeau from 0 to n
-    voisins = []
-    for i in range(n):
-        voisins.append([idx for idx in range(n) if graph[i][idx] == 1])
     nbDegre = [len(i) for i in voisins]
     max_value = max(nbDegre)
     v = nbDegre.index(max_value)  # sommet qui a plus de donnees
     c[v] = 0  # premier couleur
-
     stack.append(c)
     while len(stack):
         c = stack.pop()
         if not (any(x == -1 for x in c)):
-            if (max(c) + 1) < max(res) + 1:
-                res = c
+            if (max(c) + 1) < (max(res) + 1):
+                res = c.copy()
                 ub = max(c) + 1
-        else:
-            if max(c) + 1 < ub:
-                for i in exploreNode(c, nbDegre, voisins, n):
-                    stack.append(i)
+        elif (max(c) + 1) < ub:
+            for i in exploreNode(c, nbDegre, n):
+                stack.append(i)
     return res
 
 
@@ -155,7 +151,7 @@ def tabou(c):
     solutionSansConflit = c.copy()
     alpha = 2
     g = 10
-    critereArret = 5000  # à déterminer
+    critereArret = 1000  # à déterminer
     n = len(c)
 
     # variables d'interet
@@ -192,9 +188,10 @@ def tabou(c):
                         bestCandidat = [candidat, currentNoeud,
                                         c[currentNoeud]]  # coloration, noeud modif, ancienne couleur
                         if conflits == 0:  # solution optimal
+                            solutionSansConflit = candidat.copy()
+                            listeCounterNoModif.append(counterNoModif)
                             tabou(candidat)
-                            return
-
+                            return solutionSansConflit
                         # actualisation solution courante
         if nbConflitMin != n * n:  # que faire si aucun candidat à cause de listetabou?
             c = bestCandidat[0]
@@ -207,6 +204,7 @@ def tabou(c):
         # actualisation solution optimale
         if getNbConflit(c) < getNbConflit(cStar):
             cStar = c.copy()
+            listeCounterNoModif.append(counterNoModif)
             counterNoModif = 0
         else:
             counterNoModif += 1
@@ -215,13 +213,15 @@ def tabou(c):
         nbIter += 1
 
     #print("nb couleur algo tabou: ", max(solutionSansConflit) + 1, "\n")
-    return (solutionSansConflit)
+    return solutionSansConflit
 
 
 def main():
+    graph, numberOfNodes = readMatrix()
+    t0 = tt.time()
+    for i in range(numberOfNodes):
+        voisins.append([idx for idx in range(numberOfNodes) if graph[i][idx] == 1])
     if algoType == "glouton":
-        graph, numberOfNodes = readMatrix()
-        t0 = tt.time()
         resultG = glouton(graph, numberOfNodes)
         t1 = tt.time()
         if showRes:
@@ -230,32 +230,23 @@ def main():
             #print(t1 - t0)
             pass
     elif algoType == "branch_bound":
-        graph, numberOfNodes = readMatrix()
-        t2 = tt.time()
-        resultBB = branchBound(graph, numberOfNodes)
-        t3 = tt.time()
+        resultBB = branchBound(graph)
+        t1 = tt.time()
         if showRes:
-            print(max(resultBB)+1,",",t2 - t3)
+            print(max(resultBB)+1,",",t1 - t0)
         if showTime:
             pass
             #print(t3 - t2)
     elif algoType == "tabou":
-        graph, numberOfNodes = readMatrix()
-        t0 = tt.time()
-        n = numberOfNodes
-        for i in range(n):
-            for j in range(n):
-                if i > j and graph[i][j] == 1:
-                    aretes.append((i, j))
-        for i in range(n):
-            voisins.append([idx for idx in range(n) if graph[i][idx] == 1])
-        resultT = tabou(glouton(graph, n))
-        t1 = tt.time()
-        if showRes:
-            print(max(resultT)+1,",",t1 - t0)
-        if showTime:
-            pass
-            #print(t1 - t0)
+        resultT = tabou(glouton(graph, numberOfNodes))
+        print("iter sans modif: ", listeCounterNoModif)
+        if resultT != None:
+            t1 = tt.time()
+            if showRes:
+                print(max(resultT)+1, ",", t1 - t0)
+            if showTime:
+                pass
+                #print(t1 - t0)
     else:
         print("this algorithm is not supported. please make sure to use 'glouton', 'branch_bound' or 'tabou'.")
 
