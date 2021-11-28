@@ -4,9 +4,13 @@ import argparse
 import math
 from collections import Counter
 import time
+import copy
+"""
+CHECK ISOLATED STATES
+"""
 
 # storing args in global variables
-cheminVersEx = "./instances/66_970.0"
+cheminVersEx = "./instances/66_99.0"
 MontrerRes = True
 
 # global variables
@@ -17,6 +21,8 @@ pairEcolier = []
 allowedNeighbors = []
 taille_index = []
 
+#strategy flags
+check_isolated_node = True
 
 def lireExemplaire():
     global allowedNeighbors
@@ -39,7 +45,7 @@ def lireExemplaire():
         allowedNeighbors[b].append(a)
 
     nb_voisin = [len(l) for l in allowedNeighbors]
-    taille_index = [[taille, index + 1] for index, taille in enumerate(taillesEcolier)]
+    taille_index = [[taille, index] for index, taille in enumerate(taillesEcolier)]
 
     print("average number of neighbors = ", nbPairesNonCham * 2 / nbEcoliers)
 
@@ -47,18 +53,31 @@ def lireExemplaire():
 
 def exploreNode(c):
     newStates = []
-    voisins = allowedNeighbors[c[2][-1]]
-    visitedNodes = [n for n in c[2]]
-    newVoisins = [voisin for voisin in voisins if voisin not in visitedNodes]  # list of indexes
+    currentNode = c[2][-1]
+    newVoisins = c[3][currentNode]
+
+    for node in c[3]:
+        if currentNode in node:
+            node.remove(currentNode)
+    c[3][currentNode] = [-1]
+
+    if newVoisins == [-1]:
+        return []
+
     for nv in newVoisins:
-        height = taillesEcolier[nv]
-        if height > c[1]:
-            newStates.append([c[0], height, c[2] + [nv]])
-        elif height <= c[1]:
-            newStates.append([c[0] + 1, c[1], c[2] + [nv]])
-        else:  # equal height
-            #TODO
+
+        if [] not in c[3]:
+            height = taillesEcolier[nv]
+            if height > c[1]:
+                newStates.append([c[0], height, c[2] + [nv], copy.deepcopy(c[3])])
+            elif height <= c[1]:
+                newStates.append([c[0] + 1, c[1], c[2] + [nv], copy.deepcopy(c[3])])
+            else:  # equal height
+                #TODO
+                pass
+        else:
             pass
+            #print("exploration avoid because of an isolated state")
     return newStates
 
 def branchBound(nbEcoliers):
@@ -73,7 +92,8 @@ def branchBound(nbEcoliers):
         print("iteration nº: ", i)
         v = listSort[i]  # iteratif lower student
         stack = []
-        c = [0, v[0], [v[1]]] #[nbConflits, max height, [index, index, ...]]
+
+        c = [0, v[0], [v[1]], copy.deepcopy(allowedNeighbors)] #[nbConflits, max height, [index, index, ...]]
         stack.append(c)
         while len(stack):
             c = stack.pop()
@@ -103,7 +123,7 @@ main()
     Idée d'amélioration
     
 - heuristique pour explorer en priorité les noueds les plus prometteurs (attention a maintenir la recherche en profondeur)
-- check si noeud isolé, dans ce cas on rejette cette solution
+- DONE check si noeud isolé, dans ce cas on rejette cette solution
 - utiliser BnB pour atteindre une solution intermédiaire (ex: solution correcte de longueur totalLength/2) et 
   implementer une auutre methode à partir de ce point (switchs ...)
 """
